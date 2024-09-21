@@ -1,0 +1,36 @@
+.container {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.AuthenticateLable {
+  padding: 10px 0px;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.AuthenticateInput {
+  width: 270px;
+  height: 35px;
+  border-width: 0px 0px 2px 0px;
+  outline-color: transparent;
+  padding: 0 10px;
+  font-family: cursive;
+}
+
+.AuthenticateInput:focus {
+  border-color: rgba(0, 0, 255, 0.425);
+  transition: 0.8s;
+}
+
+.AuthenticateButton {
+  padding: 10px 20px;
+  border-radius: 5px;
+  border: solid thin gray;
+  background-color: white;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}

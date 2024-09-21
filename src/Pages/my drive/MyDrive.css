@@ -1,0 +1,23 @@
+.setWidthOfSideBar {
+  width: 250px;
+}
+
+.setMainScreen {
+  margin-left: 250px;
+}
+
+.Title {
+  margin: 25px 0 20px 30px;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+@media screen and (max-width: 768px) {
+  .setWidthOfSideBar {
+    width: 50px;
+  }
+
+  .setMainScreen {
+    margin-left: 0px;
+  }
+}
