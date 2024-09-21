@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Starred from "./Pages/Starred/Starred";
 import RecentImg from "./Pages/recentImg/RecentImg";
+import { Toaster } from "sonner";
 
 function App() {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ function App() {
         <Route path="/recent" element={<RecentImg />} />
         <Route path="/starredPic" element={<Starred />} />
       </Routes>
+      <Toaster richColors position="top-center" duration={1800} />
     </>
   );
 }

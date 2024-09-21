@@ -13,6 +13,7 @@ body {
   margin-left: 30px;
   margin-bottom: 20px;
   box-sizing: border-box; /* Ensure padding and border don't add to the width */
+  cursor: pointer;
 }
 
 .imgCard:hover {

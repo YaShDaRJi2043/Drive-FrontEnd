@@ -1,7 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import "./SideAndUpperHeader.css";
 import { imageStorage } from "../firebase/Config";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  getStorage,
+  deleteObject,
+} from "firebase/storage";
 import { v4 } from "uuid";
 import BASE_URL from "../../services/Helper";
 import AddIcon from "@mui/icons-material/Add";
@@ -27,8 +33,13 @@ import AccordionSummary from "@mui/material/AccordionSummary";
 import AccordionDetails from "@mui/material/AccordionDetails";
 import Typography from "@mui/material/Typography";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import Spinner from "../spinner/Spinner";
+import { dataContext } from "../Context/ContextProvider";
+import { toast } from "sonner";
 
 const SideAndUpperHeader = () => {
+  const { dataCalled, setDataCalled } = useContext(dataContext);
+
   const sidebarRef = useRef();
   const inputRef = useRef(null);
 
@@ -47,6 +58,7 @@ const SideAndUpperHeader = () => {
   const [fileSize, setFileSize] = useState("");
   const [getUsedSize, setGetUsedSize] = useState("");
   const [userData, setUserData] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // open menu for image upload
   const openFileMenu = () => {
@@ -58,6 +70,7 @@ const SideAndUpperHeader = () => {
     if (img === "") {
       return;
     } else {
+      setLoading(true);
       const imgRef = ref(imageStorage, `photos/${v4()}`);
       uploadBytes(imgRef, img).then((value) => {
         setFileName(value?.metadata?.name);
@@ -76,9 +89,7 @@ const SideAndUpperHeader = () => {
   useEffect(() => {
     setEmail(localStorage.getItem("email"));
 
-    if (imgUrl === "") {
-      return;
-    } else {
+    if (imgUrl.length > 0) {
       const data = new FormData();
       data.append("email", email);
       data.append("pics", imgUrl);
@@ -90,20 +101,36 @@ const SideAndUpperHeader = () => {
       BASE_URL.post("/usersPicData", data)
         .then(() => {
           setImgUrl("");
+          setLoading(false);
+          setDataCalled(true);
         })
-        .catch((err) => console.log(err));
+        .catch((err) => {
+          setLoading(false);
+          toast.warning(err?.response?.data?.message);
+          const storage = getStorage();
+          const desertRef = ref(storage, `photos/${fileName}`);
+          deleteObject(desertRef)
+            .then(() => {
+              console.log("Deleted in firebase");
+            })
+            .catch((error) => {
+              console.log(error, "Not Deleted in firebase");
+            });
+        });
     }
   }, [imgUrl]);
 
   // get file from mongoDB
-  async function displayData() {
-    const email = localStorage.getItem("email");
-    const imgs = BASE_URL.get(`/showUsersData?email=${email}`);
-    setGetUsedSize((await imgs).data[0]?.totalSize);
-  }
-
   useEffect(() => {
-    displayData();
+    async function displayData() {
+      const email = localStorage.getItem("email");
+      const imgs = BASE_URL.get(`/showUsersData?email=${email}`).then();
+      setGetUsedSize((await imgs).data[0]?.totalSize);
+    }
+
+    if (dataCalled === true) {
+      displayData();
+    }
   });
 
   // get user details
@@ -185,96 +212,130 @@ const SideAndUpperHeader = () => {
   // window.innerWidth > 768
   const renderSidebar = () => {
     return (
-      <div className="d-flex">
-        {/* desktop screen sidebar */}
-        <div className="sidebar open">
-          <div style={{ padding: "20px 30px 10px" }}>
-            <img
-              src="Drive_Logo.png"
-              alt="img"
-              height="40px"
-              className="LogoImg"
-            />
-            <span className="LogoTxt">SillyStorage</span>
+      <>
+        {loading && (
+          <div className="spinner">
+            <Spinner />
           </div>
+        )}
+        <div className="d-flex">
+          {/* desktop screen sidebar */}
+          <div className="sidebar open">
+            <div style={{ padding: "20px 30px 10px" }}>
+              <img
+                src="Drive_Logo.png"
+                alt="img"
+                height="40px"
+                className="LogoImg"
+              />
+              <span className="LogoTxt">SillyStorage</span>
+            </div>
 
-          {/* display none */}
-          <div className="d-none">
-            <input
-              type="file"
-              name=""
-              id=""
-              ref={inputRef}
-              onChange={(e) => setImg(e.target.files[0])}
-            />
-          </div>
+            {/* display none */}
+            <div className="d-none">
+              <input
+                type="file"
+                name=""
+                id=""
+                ref={inputRef}
+                onChange={(e) => setImg(e.target.files[0])}
+              />
+            </div>
 
-          <div className="NewBox" onClick={openFileMenu}>
-            <span>
-              <AddIcon />
-            </span>
-            <span>New</span>
-          </div>
-          <nav>
-            <ul>
-              <NavLink to="/mystorage" style={{ textDecoration: "none" }}>
-                <li>
-                  <span className="sideBarLogo">
-                    <CloudDoneRoundedIcon />
-                  </span>
-                  <span className="sideBarTxt">My Storage</span>
-                </li>
-              </NavLink>
-              <NavLink to="/recent" style={{ textDecoration: "none" }}>
-                <li>
-                  <span className="sideBarLogo">
-                    <AccessTimeIcon />
-                  </span>
-                  <span className="sideBarTxt">Recent</span>
-                </li>
-              </NavLink>
-              <NavLink to="/starredPic" style={{ textDecoration: "none" }}>
-                <li>
-                  <span className="sideBarLogo">
-                    <StarOutlineIcon />
-                  </span>
-                  <span className="sideBarTxt">Starred</span>
-                </li>
-              </NavLink>
-              {/* <li>
+            <div className="NewBox" onClick={openFileMenu}>
+              <span>
+                <AddIcon />
+              </span>
+              <span>New</span>
+            </div>
+
+            <nav>
+              <ul>
+                <NavLink
+                  to="/mystorage"
+                  style={{ textDecoration: "none" }}
+                  onClick={() => setDataCalled(true)}
+                >
+                  <li>
+                    <span className="sideBarLogo">
+                      <CloudDoneRoundedIcon />
+                    </span>
+                    <span className="sideBarTxt">My Storage</span>
+                  </li>
+                </NavLink>
+                <NavLink
+                  to="/recent"
+                  style={{ textDecoration: "none" }}
+                  onClick={() => setDataCalled(true)}
+                >
+                  <li>
+                    <span className="sideBarLogo">
+                      <AccessTimeIcon />
+                    </span>
+                    <span className="sideBarTxt">Recent</span>
+                  </li>
+                </NavLink>
+                <NavLink
+                  to="/starredPic"
+                  style={{ textDecoration: "none" }}
+                  onClick={() => setDataCalled(true)}
+                >
+                  <li>
+                    <span className="sideBarLogo">
+                      <StarOutlineIcon />
+                    </span>
+                    <span className="sideBarTxt">Starred</span>
+                  </li>
+                </NavLink>
+                {/* <li>
                 <span className="sideBarLogo">
                   <DeleteOutlinedIcon />
                 </span>
                 <span className="sideBarTxt">Trash</span>
               </li> */}
-            </ul>
-            <div style={{ paddingLeft: "10%", paddingTop: "10px" }}>
-              <ProgressBar
-                completed={getUsedSize / 150}
-                bgColor="rgb(26,115,232)"
-                height="5px"
-                width="80%"
-                isLabelVisible={false}
-              />
-              <label className="progressLabel">
-                {!getUsedSize || getUsedSize == "0.00" ? (
-                  <span>0</span>
-                ) : getUsedSize < 1000 ? (
-                  getUsedSize
-                ) : (
-                  getUsedSize / 1000
-                )}{" "}
-                {getUsedSize < 1000 ? "MB" : "GB"} of 15 GB used
-              </label>
-            </div>
-          </nav>
-        </div>
+              </ul>
+              <div style={{ paddingLeft: "10%", paddingTop: "10px" }}>
+                {/* <ProgressBar
+                  completed={getUsedSize / 150}
+                  bgColor="rgb(26,115,232)"
+                  height="5px"
+                  width="80%"
+                  isLabelVisible={false}
+                />
+                <label className="progressLabel">
+                  {!getUsedSize || getUsedSize == "0.00" ? (
+                    <span>0</span>
+                  ) : getUsedSize < 1000 ? (
+                    getUsedSize
+                  ) : (
+                    getUsedSize / 1000
+                  )}{" "}
+                  {getUsedSize < 1000 ? "MB" : "GB"} of 15 GB used
+                </label> */}
+                <ProgressBar
+                  completed={getUsedSize * 10}
+                  bgColor="rgb(26,115,232)"
+                  height="5px"
+                  width="80%"
+                  isLabelVisible={false}
+                />
+                <label className="progressLabel">
+                  {!getUsedSize || getUsedSize == "0.00" ? (
+                    <span>0</span>
+                  ) : (
+                    getUsedSize
+                  )}{" "}
+                  MB of 10 MB used
+                </label>
+              </div>
+            </nav>
+          </div>
 
-        {/* desktop screen upper header */}
-        <div>
-          <div className="mobileviewheader">
-            <div className="searchBarDiv">
-              {/* <i className="searchBarIcon">
+          {/* desktop screen upper header */}
+          <div>
+            <div className="mobileviewheader">
+              <div className="searchBarDiv">
+                {/* <i className="searchBarIcon">
                 <SearchIcon />
               </i>
               <input 
@@ -282,188 +343,198 @@ const SideAndUpperHeader = () => {
                 placeholder="Search in Drive"
                 className="searchBar"
               /> */}
-            </div>
+              </div>
 
-            <div className="p-3 me-2 avatarIconDive">
-              <Avatar
-                sx={{ bgcolor: cyan[700], width: 35, height: 35 }}
-                aria-controls={open ? "basic-menu" : undefined}
-                aria-haspopup="true"
-                aria-expanded={open ? "true" : undefined}
-                onClick={handleClick}
-                className="avatarIcon"
+              <div className="p-3 me-2 avatarIconDive">
+                <Avatar
+                  sx={{ bgcolor: cyan[700], width: 35, height: 35 }}
+                  aria-controls={open ? "basic-menu" : undefined}
+                  aria-haspopup="true"
+                  aria-expanded={open ? "true" : undefined}
+                  onClick={handleClick}
+                  className="avatarIcon"
+                >
+                  {userData?.slice(0, 1).toUpperCase()}
+                </Avatar>
+              </div>
+
+              <Menu
+                id="basic-menu"
+                anchorEl={anchorEl}
+                open={open}
+                onClose={handleClose}
+                sx={{
+                  mt: "1px",
+                  "& .MuiMenu-paper": {
+                    backgroundColor: "rgb(226, 232, 244)",
+                    borderRadius: "25px",
+                    marginTop: "20px",
+                  },
+                }}
               >
-                {userData?.slice(0, 1).toUpperCase()}
-              </Avatar>
-            </div>
+                <div className="menuEmail h6">{email}</div>
 
-            <Menu
-              id="basic-menu"
-              anchorEl={anchorEl}
-              open={open}
-              onClose={handleClose}
-              sx={{
-                mt: "1px",
-                "& .MuiMenu-paper": {
-                  backgroundColor: "rgb(226, 232, 244)",
-                  borderRadius: "25px",
-                  marginTop: "20px",
-                },
-              }}
-            >
-              <div className="menuEmail h6">{email}</div>
-
-              <div className="d-flex justify-content-center mt-3">
-                <Stack direction="row" spacing={2}>
-                  <Badge
-                    overlap="circular"
-                    anchorOrigin={{
-                      vertical: "bottom",
-                      horizontal: "right",
-                    }}
-                    badgeContent={
-                      <SmallAvatar sx={{ color: "black" }}>
-                        <EditOutlinedIcon sx={{ fontSize: 18 }} />
-                      </SmallAvatar>
-                    }
-                  >
-                    <Avatar
-                      sx={{
-                        bgcolor: cyan[700],
-                        width: 70,
-                        height: 70,
-                        fontSize: 42,
+                <div className="d-flex justify-content-center mt-3">
+                  <Stack direction="row" spacing={2}>
+                    <Badge
+                      overlap="circular"
+                      anchorOrigin={{
+                        vertical: "bottom",
+                        horizontal: "right",
                       }}
+                      badgeContent={
+                        <SmallAvatar sx={{ color: "black" }}>
+                          <EditOutlinedIcon sx={{ fontSize: 18 }} />
+                        </SmallAvatar>
+                      }
                     >
-                      {userData?.toString()?.slice(0, 1).toUpperCase()}
-                    </Avatar>
-                  </Badge>
-                </Stack>
-              </div>
-
-              <div className="text-center mt-2 h4 fw-normal">
-                Hi, {userData}
-              </div>
-
-              <div className="d-flex justify-content-center mt-4 mb-3">
-                <div className="menuSignout" onClick={signout}>
-                  <div>
-                    <LogoutOutlinedIcon className="menuSignoutIcon" />
-                  </div>
-                  <div className="menuSignoutTxt">Sign out</div>
+                      <Avatar
+                        sx={{
+                          bgcolor: cyan[700],
+                          width: 70,
+                          height: 70,
+                          fontSize: 42,
+                        }}
+                      >
+                        {userData?.toString()?.slice(0, 1).toUpperCase()}
+                      </Avatar>
+                    </Badge>
+                  </Stack>
                 </div>
-              </div>
-            </Menu>
+
+                <div className="text-center mt-2 h4 fw-normal">
+                  Hi, {userData}
+                </div>
+
+                <div className="d-flex justify-content-center mt-4 mb-3">
+                  <div className="menuSignout" onClick={signout}>
+                    <div>
+                      <LogoutOutlinedIcon className="menuSignoutIcon" />
+                    </div>
+                    <div className="menuSignoutTxt">Sign out</div>
+                  </div>
+                </div>
+              </Menu>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   };
 
   return (
-    <div className="side-header">
-      {window.innerWidth > 768 ? (
-        renderSidebar()
-      ) : (
-        <>
-          {isSidebarOpen ? (
-            <div>
-              {/* mobile screen sidebar */}
-              <div className={`sidebar open`} ref={sidebarRef}>
-                <div style={{ padding: "10px 30px" }}>
-                  <div>
-                    <Avatar
-                      sx={{ bgcolor: deepPurple[500], width: 35, height: 35 }}
-                    >
-                      {userData?.toString()?.slice(0, 1).toUpperCase()}
-                    </Avatar>
-                  </div>
-                  <div>
-                    <Accordion
-                      sx={{
-                        boxShadow: "none",
-                        backgroundColor: "#f7f9fc",
-                      }}
-                    >
-                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography>{email}</Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <div className="d-flex justify-content-center">
-                          <div
-                            onClick={signout}
-                            style={{
-                              display: "flex",
-                              backgroundColor: "white",
-                              padding: "15px",
-                              borderRadius: "25px",
-                            }}
-                          >
-                            <div>
-                              <LogoutOutlinedIcon
-                                style={{ color: "#5f6368" }}
-                              />
+    <>
+      <div className="side-header">
+        {window.innerWidth > 768 ? (
+          renderSidebar()
+        ) : (
+          <>
+            {loading && (
+              <div className="spinner">
+                <Spinner />
+              </div>
+            )}
+            {isSidebarOpen ? (
+              <div>
+                {/* mobile screen sidebar */}
+                <div className={`sidebar open`} ref={sidebarRef}>
+                  <div style={{ padding: "10px 30px" }}>
+                    <div>
+                      <Avatar
+                        sx={{ bgcolor: deepPurple[500], width: 35, height: 35 }}
+                      >
+                        {userData?.toString()?.slice(0, 1).toUpperCase()}
+                      </Avatar>
+                    </div>
+                    <div>
+                      <Accordion
+                        sx={{
+                          boxShadow: "none",
+                          backgroundColor: "#f7f9fc",
+                        }}
+                      >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                          <Typography>{email}</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          <div className="d-flex justify-content-center">
+                            <div
+                              onClick={signout}
+                              style={{
+                                display: "flex",
+                                backgroundColor: "white",
+                                padding: "15px",
+                                borderRadius: "25px",
+                              }}
+                            >
+                              <div>
+                                <LogoutOutlinedIcon
+                                  style={{ color: "#5f6368" }}
+                                />
+                              </div>
+                              <div className="menuSignoutTxt">Sign out</div>
                             </div>
-                            <div className="menuSignoutTxt">Sign out</div>
                           </div>
-                        </div>
-                      </AccordionDetails>
-                    </Accordion>
+                        </AccordionDetails>
+                      </Accordion>
+                    </div>
                   </div>
-                </div>
 
-                <Divider sx={{ bgcolor: blueGrey[900] }} />
+                  <Divider sx={{ bgcolor: blueGrey[900] }} />
 
-                {/* display none */}
-                <div className="d-none">
-                  <input
-                    type="file"
-                    name=""
-                    id=""
-                    ref={inputRef}
-                    onChange={(e) => setImg(e.target.files[0])}
-                  />
-                </div>
+                  {/* display none */}
+                  <div className="d-none">
+                    <input
+                      type="file"
+                      name=""
+                      id=""
+                      ref={inputRef}
+                      onChange={(e) => setImg(e.target.files[0])}
+                    />
+                  </div>
 
-                <div className="NewBox" onClick={openFileMenu}>
-                  <span>
-                    <AddIcon />
-                  </span>
-                  <span>New</span>
-                </div>
-                <nav>
-                  <ul>
-                    <li
-                      onClick={() => {
-                        handleNavigation("/mystorage");
-                      }}
-                    >
-                      <span className="sideBarLogo">
-                        <CloudDoneRoundedIcon />
-                      </span>
-                      <span className="sideBarTxt">My Drive</span>
-                    </li>
-                    <li
-                      onClick={() => {
-                        handleNavigation("/recent");
-                      }}
-                    >
-                      <span className="sideBarLogo">
-                        <AccessTimeIcon />
-                      </span>
-                      <span className="sideBarTxt">Recent</span>
-                    </li>
-                    <li
-                      onClick={() => {
-                        handleNavigation("/starredPic");
-                      }}
-                    >
-                      <span className="sideBarLogo">
-                        <StarOutlineIcon />
-                      </span>
-                      <span className="sideBarTxt">Starred</span>
-                    </li>
-                    {/* <li
+                  <div className="NewBox" onClick={openFileMenu}>
+                    <span>
+                      <AddIcon />
+                    </span>
+                    <span>New</span>
+                  </div>
+                  <nav>
+                    <ul>
+                      <li
+                        onClick={() => {
+                          handleNavigation("/mystorage");
+                          setDataCalled(true);
+                        }}
+                      >
+                        <span className="sideBarLogo">
+                          <CloudDoneRoundedIcon />
+                        </span>
+                        <span className="sideBarTxt">My Drive</span>
+                      </li>
+                      <li
+                        onClick={() => {
+                          handleNavigation("/recent");
+                          setDataCalled(true);
+                        }}
+                      >
+                        <span className="sideBarLogo">
+                          <AccessTimeIcon />
+                        </span>
+                        <span className="sideBarTxt">Recent</span>
+                      </li>
+                      <li
+                        onClick={() => {
+                          handleNavigation("/starredPic");
+                          setDataCalled(true);
+                        }}
+                      >
+                        <span className="sideBarLogo">
+                          <StarOutlineIcon />
+                        </span>
+                        <span className="sideBarTxt">Starred</span>
+                      </li>
+                      {/* <li
                       onClick={() => {
                         handleNavigation("");
                       }}
@@ -473,12 +544,12 @@ const SideAndUpperHeader = () => {
                       </span>
                       <span className="sideBarTxt">Trash</span>
                     </li> */}
-                  </ul>
+                    </ul>
 
-                  <Divider sx={{ bgcolor: blueGrey[900] }} />
+                    <Divider sx={{ bgcolor: blueGrey[900] }} />
 
-                  <div style={{ paddingLeft: "10%", paddingTop: "30px" }}>
-                    <ProgressBar
+                    <div style={{ paddingLeft: "10%", paddingTop: "30px" }}>
+                      {/* <ProgressBar
                       completed={getUsedSize / 150}
                       bgColor="rgb(26,115,232)"
                       height="5px"
@@ -494,37 +565,53 @@ const SideAndUpperHeader = () => {
                         getUsedSize / 1000
                       )}{" "}
                       {getUsedSize < 1000 ? "MB" : "GB"} of 15 GB used
-                    </label>
-                  </div>
-                </nav>
-              </div>
+                    </label> */}
+                      <ProgressBar
+                        completed={getUsedSize * 10}
+                        bgColor="rgb(26,115,232)"
+                        height="5px"
+                        width="80%"
+                        isLabelVisible={false}
+                      />
+                      <label className="progressLabel">
+                        {!getUsedSize || getUsedSize == "0.00" ? (
+                          <span>0</span>
+                        ) : (
+                          getUsedSize
+                        )}{" "}
+                        MB of 10 MB used
+                      </label>
+                    </div>
+                  </nav>
+                </div>
 
-              {/* ṃobile screen upper header */}
-              <div className="mobileviewheader ms-5">
-                <div className="mobileViewTitle">SillyStorage</div>
-                {/* <div className="mobileViewMenuIcon">
+                {/* ṃobile screen upper header */}
+                <div className="mobileviewheader ms-5">
+                  <div className="mobileViewTitle">SillyStorage</div>
+                  {/* <div className="mobileViewMenuIcon">
                   <MoreVertIcon />
                 </div> */}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="d-inline-flex">
-              <div className="toggle-btn d-flex" onClick={toggleSidebar}>
-                ☰
-              </div>
+            ) : (
+              <div className="d-inline-flex">
+                <div className="toggle-btn d-flex" onClick={toggleSidebar}>
+                  ☰
+                </div>
 
-              {/* ṃobile screen upper header */}
-              <div className="mobileviewheader">
-                <div className="mobileViewTitle">SillyStorage</div>
-                {/* <div className="mobileViewMenuIcon">
+                {/* ṃobile screen upper header */}
+                <div className="mobileviewheader">
+                  <div className="mobileViewTitle">SillyStorage</div>
+                  {/* <div className="mobileViewMenuIcon">
                   <MoreVertIcon />
                 </div> */}
+                </div>
               </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
   );
 };
 

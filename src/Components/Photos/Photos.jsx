@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import "./Photos.css";
 import BASE_URL from "../../services/Helper";
 import CardHeader from "@mui/material/CardHeader";
@@ -32,8 +32,12 @@ import Snackbar from "@mui/material/Snackbar";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import Alert from "@mui/material/Alert";
+import { dataContext } from "../Context/ContextProvider";
+import { toast } from "sonner";
 
 const Photos = (props) => {
+  const { dataCalled, setDataCalled } = useContext(dataContext);
+
   const [imgUrl, setImgUrl] = useState([]);
   const [email, setEmail] = useState("");
   const [debouncedElement, setDebouncedElement] = useState(null);
@@ -54,8 +58,10 @@ const Photos = (props) => {
         props.path === "/displayRecentImg?email="
       ) {
         setImgUrl(response?.data[0]?.photos);
+        setDataCalled(false);
       } else {
         setImgUrl(response?.data);
+        setDataCalled(false);
       }
     } catch (error) {
       console.log("Feach Error");
@@ -64,14 +70,19 @@ const Photos = (props) => {
   };
 
   useEffect(() => {
-    displayImage();
+    if (dataCalled === true) {
+      displayImage();
+    }
   });
 
   const starredApi = async (element) => {
     try {
       await BASE_URL.put(
         `/changeValueOfIsStar?email=${email}&id=${element?._id}`
-      );
+      ).then((res) => {
+        toast.success(res.data.message);
+        setDataCalled(true);
+      });
     } catch (error) {
       console.error("Error in starredApi:", error);
     }
@@ -131,6 +142,7 @@ const Photos = (props) => {
       await BASE_URL.delete(
         `/deleteImgFromMianPage?email=${email}&id=${id._id}`
       ).then(() => {
+        setDataCalled(true);
         const storage = getStorage();
         const desertRef = ref(storage, `photos/${id.fileName}`);
         deleteObject(desertRef)
@@ -138,7 +150,7 @@ const Photos = (props) => {
             console.log("Deleted in firebase");
           })
           .catch((error) => {
-            console.log(error, "Deleted in firebase");
+            console.log(error, "Not Deleted in firebase");
           });
       });
     } catch (error) {
@@ -349,6 +361,7 @@ const Photos = (props) => {
                     </div>
                   </CardContent>
                 </div>
+
                 <Modal
                   show={show}
                   onHide={() => setShow(false)}

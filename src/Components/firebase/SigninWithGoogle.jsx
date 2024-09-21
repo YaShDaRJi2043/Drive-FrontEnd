@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { auth, provider } from "./Config";
 import { signInWithPopup } from "firebase/auth";
 import BASE_URL from "../../services/Helper";
 import { useNavigate } from "react-router-dom";
+import { dataContext } from "../Context/ContextProvider";
 
 const SigninWithGoogle = () => {
+  const { dataCalled, setDataCalled } = useContext(dataContext);
+
   const [googleUserData, setGoogleUserData] = useState();
 
   const navigate = useNavigate();
@@ -27,6 +30,7 @@ const SigninWithGoogle = () => {
       localStorage.setItem("userToken", googleData.user.accessToken);
       localStorage.setItem("email", googleData.user.email);
       navigate("/mystorage");
+      setDataCalled(true);
     });
   };
 

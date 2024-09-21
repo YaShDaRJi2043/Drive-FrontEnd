@@ -4,6 +4,8 @@ import BASE_URL from "../../../services/Helper";
 import SigninWithGoogle from "../../../Components/firebase/SigninWithGoogle";
 import "../Authenticate.css";
 import Divider from "@mui/material/Divider";
+import Spinner from "../../../Components/spinner/Spinner";
+import { toast } from "sonner";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -13,7 +15,9 @@ const Register = () => {
     LastName: "",
     Email: "",
     Password: "",
+    ConfirmPassword: "",
   });
+  const [loading, setLoading] = useState(false);
 
   const txt = (e) => {
     const { name, value } = e.target;
@@ -21,25 +25,53 @@ const Register = () => {
   };
 
   const btnn = async () => {
-    const { FirstName, LastName, Email, Password } = userData;
+    const { FirstName, LastName, Email, Password, ConfirmPassword } = userData;
 
-    const data = new FormData();
-    data.append("FirstName", FirstName);
-    data.append("LastName", LastName);
-    data.append("email", Email);
-    data.append("Password", Password);
+    if (FirstName === "") {
+      toast.warn("Enter Your FirstName!!");
+    } else if (LastName === "") {
+      toast.warn("Enter Your LastName!!");
+    } else if (Email === "") {
+      toast.warn("Enter a Email!!");
+    } else if (Password === "") {
+      toast.warn("Enter a Password!!");
+    } else if (Password.length < 6) {
+      toast.warn("Password Must Have Atleast 6 Digit!!");
+    } else if (ConfirmPassword === "") {
+      toast.warn("Re-Enter Password!!");
+    } else if (Password !== ConfirmPassword) {
+      toast.warn("Password And Confirm Password Can Not Matched!!");
+    } else {
+      const data = new FormData();
+      data.append("FirstName", FirstName);
+      data.append("LastName", LastName);
+      data.append("email", Email);
+      data.append("Password", Password);
 
-    BASE_URL.post("/userRegister", data)
-      .then((res) => {
-        console.log(res);
-        localStorage.setItem("email", Email);
-        navigate("/");
-      })
-      .catch((err) => console.log(err));
+      setLoading(true);
+      BASE_URL.post("/userRegister", data)
+        .then((res) => {
+          console.log(res);
+          localStorage.setItem("email", Email);
+          navigate("/");
+        })
+        .catch((err) => {
+          console.log(err?.response?.data?.message);
+          toast.warn(err?.response?.data?.message);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
   };
 
   return (
     <>
+      {loading && (
+        <div className="spinner">
+          <Spinner />
+        </div>
+      )}
       <div className="container">
         <div
           style={{
@@ -105,6 +137,7 @@ const Register = () => {
               <input
                 type="password"
                 name="ConfirmPassword"
+                onChange={txt}
                 className="AuthenticateInput"
               />
             </div>

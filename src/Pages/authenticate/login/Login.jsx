@@ -4,6 +4,8 @@ import BASE_URL from "../../../services/Helper";
 import SigninWithGoogle from "../../../Components/firebase/SigninWithGoogle";
 import "../Authenticate.css";
 import Divider from "@mui/material/Divider";
+import Spinner from "../../../Components/spinner/Spinner";
+import { toast } from "sonner";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -12,6 +14,7 @@ const Login = () => {
     Email: "",
     Password: "",
   });
+  const [loading, setLoading] = useState(false);
 
   const txt = (e) => {
     const { name, value } = e.target;
@@ -21,22 +24,41 @@ const Login = () => {
   const btnn = async () => {
     const { Email, Password } = userData;
 
-    const data = new FormData();
-    data.append("Email", Email);
-    data.append("Password", Password);
+    if (Email === "") {
+      toast.warning("Enter a Email!!");
+    } else if (Password === "") {
+      toast.warning("Enter a Password!!");
+    } else {
+      const data = new FormData();
+      data.append("Email", Email);
+      data.append("Password", Password);
 
-    BASE_URL.post("/userLogin", data)
-      .then((res) => {
-        console.log(res);
-        localStorage.setItem("userToken", res.data.tokan);
-        localStorage.setItem("email", Email);
-        navigate("/mystorage");
-      })
-      .catch((err) => console.log(err));
+      setLoading(true);
+
+      BASE_URL.post("/userLogin", data)
+        .then((res) => {
+          console.log(res);
+          localStorage.setItem("userToken", res.data.tokan);
+          localStorage.setItem("email", Email);
+          navigate("/mystorage");
+        })
+        .catch((err) => {
+          console.log(err?.response?.data?.message);
+          toast.warning(err?.response?.data?.message);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
   };
 
   return (
     <>
+      {loading && (
+        <div className="spinner">
+          <Spinner />
+        </div>
+      )}
       <div className="container">
         <div
           style={{
